@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Markdown publishing client for WeChat / Juejin / Zhihu",
   "author": "md-publish",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "main": "./out/main/index.js",
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",

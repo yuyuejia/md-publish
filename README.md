@@ -40,44 +40,9 @@ npm run build      # 构建
 ```bash
 npm run pack:mac   # macOS dmg (arm64 + x64)
 npm run pack:win   # Windows nsis (x64 + arm64)
-npm run pack:mas   # macOS App Store 包 (.pkg)
 ```
 
 发布流程通过 GitHub Actions（`.github/workflows/build.yml`）在各自平台分别构建。
-
-## 发布到 Mac App Store（MAS）
-
-`npm run pack:mas` 会产出 App Store 用的 `.pkg`，但**必须**先在发布机具备以下条件，否则会报
-`cannot find valid "Apple Distribution, 3rd Party Mac Developer Application" identity`：
-
-1. **Apple Developer Program** 账号（付费）。
-2. **证书**（钥匙串登录）：
-   - `Apple Distribution`（或 `3rd Party Mac Developer Application`）—— 签名 App
-   - `3rd Party Mac Developer Installer` —— 签名 `.pkg`
-3. **App Store Connect** 应用记录，Bundle ID 必须为 `com.mdpublish.app`（见 `electron-builder.yml: appId`）。
-4. **Mac App Store 描述文件**（`.provisionprofile`），并在 `electron-builder.yml` 配置：
-   ```yaml
-   mac:
-     provisioningProfile: build/md-publish.provisionprofile
-   ```
-5. **应用图标**：`build/icon.png`（1024×1024，含透明通道），否则会使用默认 Electron 图标而被审核拒绝。
-6. 可选：用环境变量提供证书（CI 场景）：`CSC_LINK`（.p12 base64/路径）、`CSC_KEY_PASSWORD`、`CSC_NAME`。
-
-打包与上传：
-
-```bash
-npm run pack:mas
-# 上传（App 专用密码，或使用 Transporter.app）
-xcrun altool --upload-app -f dist/*.pkg -t macos -u "<appleId>" -p "<app-specific-password>"
-```
-
-> ✅ **沙箱文件访问已支持**：MAS 沙箱下通过「选择文件夹」取得的权限重启后会失效，应用会为工作区创建
-> **security-scoped bookmark** 并持久化，启动时自动恢复访问（原生模块 `native/mac-bookmark`）。
-> `pack:mac` / `pack:mas` 会先编译该原生模块（macOS），并以 `extraResources` 打进 `Resources/mac-bookmark/`。
-> 非 macOS 或模块缺失时自动降级为普通路径访问。
->
-> 若不发布 App Store，推荐使用 **Developer ID 签名 + 公证（notarize）的 dmg** 分发：无需沙箱，
-> 工作区文件访问不受限制。
 
 ## 目录结构
 
@@ -93,7 +58,7 @@ src/
     publish.ts
     ipc/
   renderer/   # React UI
-build/        # 打包资源（entitlements、图标、描述文件）
+build/        # 打包资源（entitlements、图标）
 ```
 
 ## 平台说明
@@ -110,4 +75,4 @@ build/        # 打包资源（entitlements、图标、描述文件）
 
 ## License
 
-MIT
+Apache-2.0
