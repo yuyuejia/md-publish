@@ -1,0 +1,8 @@
+{
+  "name": "@md-publish/mac-bookmark",
+  "version": "0.1.0",
+  "private": true,
+  "description": "macOS security-scoped bookmarks for Electron (App Sandbox)",
+  "main": "index.js",
+  "gypfile": true
+}

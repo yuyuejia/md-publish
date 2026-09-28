@@ -1,0 +1,13 @@
+node_modules/
+out/
+dist/
+.verify/
+native/mac-bookmark/build/
+.DS_Store
+*.log
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+.env.local

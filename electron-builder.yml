@@ -1,0 +1,48 @@
+appId: com.mdpublish.app
+productName: md-publish
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+mac:
+  category: public.app-category.productivity
+  icon: build/icon.icns
+  hardenedRuntime: true
+  entitlements: build/entitlements.mas.plist
+  entitlementsInherit: build/entitlements.mas.inherit.plist
+  extraResources:
+    - from: native/mac-bookmark/build/Release/mac-bookmark.node
+      to: mac-bookmark/mac-bookmark.node
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+mas:
+  category: public.app-category.productivity
+  entitlements: build/entitlements.mas.plist
+  entitlementsInherit: build/entitlements.mas.inherit.plist
+  hardenedRuntime: false
+  extraResources:
+    - from: native/mac-bookmark/build/Release/mac-bookmark.node
+      to: mac-bookmark/mac-bookmark.node
+  target:
+    - target: mas
+      arch:
+        - arm64
+        - x64
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - arm64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

@@ -1,0 +1,5 @@
+declare module 'markdown-it-task-lists'
+declare module 'markdown-it-footnote'
+declare module '*.css'
+declare module '*.png'
+declare module '*.svg'
