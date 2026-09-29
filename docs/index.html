@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>md-publish · 一键发布 Markdown 到多平台</title>
+    <meta
+      name="description"
+      content="md-publish 是一款跨平台桌面客户端，将本地 Markdown 文档一键发布到微信公众号、稀土掘金、知乎、今日头条。"
+    />
+    <link rel="icon" href="icon.png" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: 255 255 255;
+        --panel: 255 255 255;
+        --panel2: 246 247 249;
+        --edge: 226 228 232;
+        --fg: 31 35 40;
+        --muted: 87 96 106;
+        --faint: 139 148 158;
+        --accent: 79 140 255;
+        --accent-weak: 79 140 255;
+        --shadow: 15 23 42;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: 22 23 26;
+          --panel: 30 31 34;
+          --panel2: 38 40 44;
+          --edge: 53 55 59;
+          --fg: 242 243 245;
+          --muted: 169 173 181;
+          --faint: 139 144 154;
+          --accent: 79 140 255;
+          --accent-weak: 79 140 255;
+          --shadow: 0 0 0;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: rgb(var(--bg));
+        color: rgb(var(--fg));
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+          'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.65;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .wrap {
+        width: 100%;
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+
+      /* ---------- header ---------- */
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: rgb(var(--bg) / 0.82);
+        backdrop-filter: saturate(180%) blur(12px);
+        border-bottom: 1px solid rgb(var(--edge));
+      }
+
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        height: 60px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .brand img {
+        width: 28px;
+        height: 28px;
+        border-radius: 7px;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 22px;
+        margin-left: auto;
+        font-size: 14px;
+        color: rgb(var(--muted));
+      }
+
+      .nav-links a:hover {
+        color: rgb(var(--fg));
+      }
+
+      .nav-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 14px;
+        border-radius: 8px;
+        background: rgb(var(--accent));
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .nav-cta:hover {
+        filter: brightness(1.08);
+      }
+
+      /* ---------- hero ---------- */
+      .hero {
+        padding: 72px 0 40px;
+        text-align: center;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 12px;
+        border: 1px solid rgb(var(--edge));
+        background: rgb(var(--panel2));
+        border-radius: 999px;
+        font-size: 13px;
+        color: rgb(var(--muted));
+      }
+
+      .pill .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #34c759;
+      }
+
+      .hero h1 {
+        margin: 20px 0 0;
+        font-size: clamp(32px, 5vw, 52px);
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+      }
+
+      .hero h1 .grad {
+        background: linear-gradient(90deg, #4f8cff, #7a5cff);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .hero p.lead {
+        margin: 18px auto 0;
+        max-width: 620px;
+        font-size: 18px;
+        color: rgb(var(--muted));
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 32px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        border: 1px solid transparent;
+        transition: filter 0.15s ease, border-color 0.15s ease;
+      }
+
+      .btn-primary {
+        background: rgb(var(--accent));
+        color: #fff;
+      }
+
+      .btn-primary:hover {
+        filter: brightness(1.08);
+      }
+
+      .btn-ghost {
+        border-color: rgb(var(--edge));
+        background: rgb(var(--panel));
+        color: rgb(var(--fg));
+      }
+
+      .btn-ghost:hover {
+        border-color: rgb(var(--accent));
+      }
+
+      .btn small {
+        font-weight: 400;
+        opacity: 0.85;
+      }
+
+      /* ---------- screenshot ---------- */
+      .shot {
+        margin: 48px auto 0;
+        max-width: 960px;
+        border: 1px solid rgb(var(--edge));
+        border-radius: 14px;
+        overflow: hidden;
+        background: rgb(var(--panel2));
+        box-shadow: 0 24px 60px -20px rgb(var(--shadow) / 0.35);
+      }
+
+      .shot .bar {
+        display: flex;
+        gap: 7px;
+        padding: 11px 14px;
+        border-bottom: 1px solid rgb(var(--edge));
+        background: rgb(var(--panel));
+      }
+
+      .shot .bar i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: rgb(var(--edge));
+      }
+
+      .shot img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      /* ---------- sections ---------- */
+      section {
+        padding: 72px 0;
+      }
+
+      section + section {
+        border-top: 1px solid rgb(var(--edge));
+      }
+
+      .sec-head {
+        text-align: center;
+        margin-bottom: 44px;
+      }
+
+      .sec-head h2 {
+        margin: 0;
+        font-size: clamp(24px, 3vw, 32px);
+        letter-spacing: -0.02em;
+      }
+
+      .sec-head p {
+        margin: 10px auto 0;
+        max-width: 560px;
+        color: rgb(var(--muted));
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .grid.two {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .card {
+        padding: 22px;
+        border: 1px solid rgb(var(--edge));
+        border-radius: 14px;
+        background: rgb(var(--panel));
+      }
+
+      .card .ico {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+        background: rgb(var(--accent) / 0.12);
+        color: rgb(var(--accent));
+        font-size: 18px;
+        margin-bottom: 14px;
+      }
+
+      .card h3 {
+        margin: 0 0 6px;
+        font-size: 16px;
+      }
+
+      .card p {
+        margin: 0;
+        font-size: 14px;
+        color: rgb(var(--muted));
+      }
+
+      /* ---------- platforms ---------- */
+      .platforms {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .platform {
+        text-align: center;
+        padding: 26px 18px;
+        border: 1px solid rgb(var(--edge));
+        border-radius: 14px;
+        background: rgb(var(--panel));
+      }
+
+      .platform .logo {
+        width: 46px;
+        height: 46px;
+        margin: 0 auto 12px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        font-size: 22px;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      .platform h3 {
+        margin: 0;
+        font-size: 15px;
+      }
+
+      .platform p {
+        margin: 6px 0 0;
+        font-size: 13px;
+        color: rgb(var(--muted));
+      }
+
+      .tag {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        background: rgb(var(--panel2));
+        border: 1px solid rgb(var(--edge));
+        color: rgb(var(--muted));
+      }
+
+      /* ---------- download ---------- */
+      .dl {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .dl-card {
+        padding: 24px;
+        border: 1px solid rgb(var(--edge));
+        border-radius: 14px;
+        background: rgb(var(--panel));
+      }
+
+      .dl-card h3 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 4px;
+        font-size: 17px;
+      }
+
+      .dl-card .os-sub {
+        margin: 0 0 18px;
+        font-size: 13px;
+        color: rgb(var(--muted));
+      }
+
+      .dl-links {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .dl-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 11px 14px;
+        border: 1px solid rgb(var(--edge));
+        border-radius: 10px;
+        font-size: 14px;
+        transition: border-color 0.15s ease, background 0.15s ease;
+      }
+
+      .dl-link:hover {
+        border-color: rgb(var(--accent));
+        background: rgb(var(--accent) / 0.06);
+      }
+
+      .dl-link .file {
+        color: rgb(var(--muted));
+        font-size: 12px;
+      }
+
+      .dl-note {
+        margin-top: 22px;
+        text-align: center;
+        font-size: 13px;
+        color: rgb(var(--faint));
+      }
+
+      /* ---------- footer ---------- */
+      footer {
+        border-top: 1px solid rgb(var(--edge));
+        padding: 34px 0;
+        font-size: 14px;
+        color: rgb(var(--muted));
+      }
+
+      .foot {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .foot .links {
+        display: flex;
+        gap: 18px;
+        margin-left: auto;
+      }
+
+      .foot a:hover {
+        color: rgb(var(--fg));
+      }
+
+      @media (max-width: 900px) {
+        .grid,
+        .platforms,
+        .dl {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .nav-links {
+          display: none;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .grid,
+        .grid.two,
+        .platforms,
+        .dl {
+          grid-template-columns: 1fr;
+        }
+        .hero {
+          padding-top: 48px;
+        }
+        section {
+          padding: 52px 0;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap nav">
+        <a class="brand" href="#top">
+          <img src="icon.png" alt="md-publish" />
+          md-publish
+        </a>
+        <nav class="nav-links">
+          <a href="#features">功能</a>
+          <a href="#platforms">支持平台</a>
+          <a href="https://github.com/yuyuejia/md-publish" target="_blank" rel="noreferrer"
+            >GitHub</a
+          >
+        </nav>
+        <a class="nav-cta" href="#download">免费下载</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <!-- Hero -->
+      <div class="wrap hero">
+        <h1>把 Markdown <span class="grad">一键发布</span><br />到多个内容平台</h1>
+        <p class="lead">
+          md-publish 是一款基于 Electron 的跨平台桌面客户端。在本地用普通
+          <code>.md</code> 文件写作、实时预览，一键发布为草稿。
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#download">下载客户端</a>
+          <a
+            class="btn btn-ghost"
+            href="https://github.com/yuyuejia/md-publish"
+            target="_blank"
+            rel="noreferrer"
+            >☆ 查看源码</a
+          >
+        </div>
+
+        <div class="shot">
+          <div class="bar"><i></i><i></i><i></i></div>
+          <img src="screenshot.png" alt="md-publish 主界面截图：左侧文档列表，中间 Markdown 编辑器，右侧实时预览" />
+        </div>
+      </div>
+
+      <!-- Features -->
+      <section id="features">
+        <div class="wrap">
+          <div class="sec-head">
+            <h2>为写作者打造的发布工具</h2>
+            <p>写作、预览、发布闭环，文档始终以纯文本保存在你自己的文件夹里。</p>
+          </div>
+          <div class="grid">
+            <div class="card">
+              <div class="ico">📁</div>
+              <h3>本地工作区</h3>
+              <p>正文即普通 .md 文件；文件外部变更自动同步。</p>
+            </div>
+            <div class="card">
+              <div class="ico">✍️</div>
+              <h3>所见即所得编辑</h3>
+              <p>CodeMirror 6 编辑器，语法高亮、快捷键、滚动同步一应俱全。</p>
+            </div>
+            <div class="card">
+              <div class="ico">👁️</div>
+              <h3>实时预览</h3>
+              <p>markdown-it + highlight.js，GitHub 风格排版，图片按文档目录解析。</p>
+            </div>
+            <div class="card">
+              <div class="ico">🚀</div>
+              <h3>一键发布</h3>
+              <p>内嵌登录窗口复用各平台登录态，默认保存为草稿，发布前可再确认。</p>
+            </div>
+            <div class="card">
+              <div class="ico">🖼️</div>
+              <h3>图片自动上传</h3>
+              <p>本地图片按平台要求上传至对应图床，并替换为可用链接。</p>
+            </div>
+            <div class="card">
+              <div class="ico">🗂️</div>
+              <h3>发布记录</h3>
+              <p>基于 SQLite 持久化每次发布结果，随时回溯发布历史。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Platforms -->
+      <section id="platforms">
+        <div class="wrap">
+          <div class="sec-head">
+            <h2>支持的平台</h2>
+          </div>
+          <div class="platforms">
+            <div class="platform">
+              <div class="logo" style="background: #07c160">微</div>
+              <h3>微信公众号</h3>
+              <p>正文内联样式，默认创建草稿</p>
+              <span class="tag">草稿优先</span>
+            </div>
+            <div class="platform">
+              <div class="logo" style="background: #1e80ff">掘</div>
+              <h3>稀土掘金</h3>
+              <p>默认存草稿，可切换为直接发布</p>
+              <span class="tag">草稿 / 发布</span>
+            </div>
+            <div class="platform">
+              <div class="logo" style="background: #0084ff">知</div>
+              <h3>知乎</h3>
+              <p>发布至知乎专栏</p>
+              <span class="tag">实验性</span>
+            </div>
+            <div class="platform">
+              <div class="logo" style="background: #d8232a">头</div>
+              <h3>今日头条</h3>
+              <p>默认保存草稿，图片上传头条图床</p>
+              <span class="tag">草稿优先</span>
+            </div>
+          </div>
+          <p class="dl-note">其他平台陆续支持中，敬请期待…</p>
+        </div>
+      </section>
+
+      <!-- Download -->
+      <section id="download">
+        <div class="wrap">
+          <div class="sec-head">
+            <h2>下载 md-publish</h2>
+            <p>支持 macOS 与 Windows。安装包在 GitHub Releases 提供，持续更新。</p>
+          </div>
+          <div class="dl">
+            <div class="dl-card">
+              <h3>🍎 macOS</h3>
+              <p class="os-sub">提供 Apple 芯片（arm64）与 Intel（x64）两个版本</p>
+              <div class="dl-links">
+                <a
+                  class="dl-link"
+                  href="https://github.com/yuyuejia/md-publish/releases/latest"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <span>Apple 芯片（M 系列）</span>
+                  <span class="file">.dmg · arm64</span>
+                </a>
+                <a
+                  class="dl-link"
+                  href="https://github.com/yuyuejia/md-publish/releases/latest"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <span>Intel 芯片</span>
+                  <span class="file">.dmg · x64</span>
+                </a>
+              </div>
+            </div>
+            <div class="dl-card">
+              <h3>🪟 Windows</h3>
+              <p class="os-sub">提供 x64 与 arm64 安装程序</p>
+              <div class="dl-links">
+                <a
+                  class="dl-link"
+                  href="https://github.com/yuyuejia/md-publish/releases/latest"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <span>Windows（64 位）</span>
+                  <span class="file">.exe · x64</span>
+                </a>
+                <a
+                  class="dl-link"
+                  href="https://github.com/yuyuejia/md-publish/releases/latest"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <span>Windows on ARM</span>
+                  <span class="file">.exe · arm64</span>
+                </a>
+              </div>
+            </div>
+          </div>
+          <p class="dl-note">
+            当前版本 v0.1.0 · 全部版本见
+            <a
+              href="https://github.com/yuyuejia/md-publish/releases"
+              target="_blank"
+              rel="noreferrer"
+              style="color: rgb(var(--accent))"
+              >GitHub Releases</a
+            >
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap foot">
+        <span>© 2026 md-publish · Apache-2.0 License</span>
+        <span class="links">
+          <a href="https://github.com/yuyuejia/md-publish" target="_blank" rel="noreferrer"
+            >GitHub</a
+          >
+          <a href="https://github.com/yuyuejia/md-publish/releases" target="_blank" rel="noreferrer"
+            >Releases</a
+          >
+          <a
+            href="https://github.com/yuyuejia/md-publish/issues"
+            target="_blank"
+            rel="noreferrer"
+            >反馈</a
+          >
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>
