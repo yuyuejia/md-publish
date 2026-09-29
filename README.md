@@ -1,6 +1,20 @@
-# md-publish
+<p align="center">
+  <img src="docs/icon.png" alt="md-publish" width="120" height="120" />
+</p>
 
-将 Markdown 文档一键发布到 **微信公众号 / 稀土掘金 / 知乎 / 今日头条** 的跨平台桌面客户端（macOS & Windows）。
+<h1 align="center">md-publish</h1>
+
+<p align="center">
+  将 Markdown 文档一键发布到 <b>微信公众号 / 稀土掘金 / 知乎 / 今日头条</b> 的跨平台桌面客户端（macOS & Windows）。
+</p>
+
+<p align="center">
+  <a href="http://md-publish.yuyuejia.com.cn">项目首页</a> ·
+  <a href="#下载">下载</a> ·
+  <a href="https://github.com/yuyuejia/md-publish/releases">Releases</a>
+</p>
+
+![md-publish 主界面截图：左侧文档列表，中间 Markdown 编辑器，右侧实时预览](docs/screenshot.png)
 
 基于 Electron + React + TypeScript。支持文档管理、编辑、实时预览，以及通过内嵌登录窗口复用各平台登录态进行发布（默认存草稿）。
 
@@ -12,6 +26,18 @@
 - 实时预览：markdown-it + highlight.js，GitHub 风格排版
 - 平台适配器：微信公众号 / 掘金 / 知乎 / 今日头条（Cookie 登录态，草稿优先）
 - 发布记录持久化（SQLite）
+
+## 下载
+
+> 项目首页：<http://md-publish.yuyuejia.com.cn> 
+
+| 平台 | 架构 | 安装包 |
+| --- | --- | --- |
+| macOS | Apple Silicon (arm64) | [md-publish-0.1.0-mac-arm64.dmg](http://md-publish.yuyuejia.com.cn/download/md-publish-0.1.0-mac-arm64.dmg) |
+| macOS | Intel (x64) | [md-publish-0.1.0-mac-x64.dmg](http://md-publish.yuyuejia.com.cn/download/md-publish-0.1.0-mac-x64.dmg) |
+| Windows | x64 | [md-publish-0.1.0-win-x64.exe](http://md-publish.yuyuejia.com.cn/download/md-publish-0.1.0-win-x64.exe) |
+| Windows | arm64 | [md-publish-0.1.0-win-arm64.exe](http://md-publish.yuyuejia.com.cn/download/md-publish-0.1.0-win-arm64.exe) |
+
 
 ## 技术栈
 
