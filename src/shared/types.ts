@@ -1,4 +1,4 @@
-export type PlatformId = 'wechat' | 'juejin' | 'zhihu' | 'toutiao'
+export type PlatformId = 'wechat' | 'juejin' | 'zhihu' | 'toutiao' | 'oschina'
 
 export interface PlatformMeta {
   id: PlatformId

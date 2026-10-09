@@ -23,7 +23,7 @@ function Welcome(): React.JSX.Element {
       <div>
         <h1 className="text-xl font-semibold text-fg">md-publish</h1>
         <p className="mt-1 text-sm text-faint">
-          选择一个文件夹作为 Markdown 工作区，开始写作并发布到微信公众号 / 掘金 / 知乎 / 今日头条
+          选择一个文件夹作为 Markdown 工作区，开始写作并发布到微信公众号 / 掘金 / 知乎 / 今日头条 / 开源中国
         </p>
       </div>
       <button

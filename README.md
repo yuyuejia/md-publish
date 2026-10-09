@@ -5,7 +5,7 @@
 <h1 align="center">md-publish</h1>
 
 <p align="center">
-  将 Markdown 文档一键发布到 <b>微信公众号 / 稀土掘金 / 知乎 / 今日头条</b> 的跨平台桌面客户端（macOS & Windows）。
+  将 Markdown 文档一键发布到 <b>微信公众号 / 稀土掘金 / 知乎 / 今日头条 / 开源中国</b> 的跨平台桌面客户端（macOS & Windows）。
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@
 - 文档管理：新建 / 重命名 / 删除 / 搜索，文件外部变更自动同步
 - 编辑器：CodeMirror 6（语法高亮、快捷键）
 - 实时预览：markdown-it + highlight.js，GitHub 风格排版
-- 平台适配器：微信公众号 / 掘金 / 知乎 / 今日头条（Cookie 登录态，草稿优先）
+- 平台适配器：微信公众号 / 掘金 / 知乎 / 今日头条 / 开源中国（Cookie 登录态，草稿优先）
 - 发布记录持久化（SQLite）
 
 ## 下载
@@ -80,7 +80,7 @@ src/
     db/       # better-sqlite3 + 迁移
     fs/       # 工作区、文档 CRUD、文件监听
     markdown/ # 文章渲染、微信内联样式
-    adapters/ # 平台适配器（base / session-manager / wechat / juejin / zhihu / toutiao）
+    adapters/ # 平台适配器（base / session-manager / wechat / juejin / zhihu / toutiao / oschina）
     publish.ts
     ipc/
   renderer/   # React UI
@@ -95,6 +95,7 @@ build/        # 打包资源（entitlements、图标）
 | 稀土掘金 | Cookie（`api.juejin.cn`） | 默认存草稿，可切换为直接发布 |
 | 知乎 | Cookie（`zhuanlan.zhihu.com`） | **实验性**：接口风控较重，部分请求需要 `x-zse-96` 签名，可能失败 |
 | 今日头条 | Cookie（`mp.toutiao.com`） | 默认保存草稿；使用 `X-CSRFToken`，正文 `<p>` 会补 `data-track`，图片上传头条图床 |
+| 开源中国 | Cookie（`apiv1.oschina.net/oschinapi`） | 默认保存草稿；正文以 Markdown 提交，图片上传开源中国图床 |
 
 每个平台使用独立的 Electron `session` 分区（`persist:mdpublish-<id>`），登录态由 Chromium
 加密持久化，互不干扰。平台适配器均为社区逆向实现，非官方 API，接口可能随时变化。

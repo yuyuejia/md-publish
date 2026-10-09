@@ -58,6 +58,7 @@
 - 掘金图床上传走字节 ImageX（`signAWS4` + TOS PUT + Commit，见 `src/main/adapters/crypto.ts`）；`CommitImageUpload` 不能手动设置 `Content-Length`，否则 Electron net 报 `ERR_INVALID_ARGUMENT`。
 - 知乎图片：远程图走 `zhuanlan.zhihu.com/api/uploaded_images`，本地图走 `api.zhihu.com/images` + OSS V1 签名；已存在的图片（`state:1`）需轮询 `api.zhihu.com/images/{id}` 直到返回 `original_hash`。
 - 今日头条：`mp.toutiao.com/mp/agw/article/publish?source=mp&type=article`（form-urlencoded，`X-CSRFToken` 取自 cookie `csrftoken`，`save=1` 存草稿），正文 `<p>` 需补递增 `data-track`；图片走 `mp/agw/article_material/photo/upload_picture`（字段 `upfile`）。无 `_signature` 依赖。
+- 开源中国：接口域 `apiv1.oschina.net/oschinapi`（JSON）。登录探测 `GET /user/myDetails`（未登录 `code=40001`）；草稿 `POST /api/draft/save_draft`（正文以 Markdown 提交，`contentType=1`，必填 `catalog`，空分类时先 `POST /blog_catalog/add?name=默认分类`，取 `result.id`）；发布 `POST /blog/web/add`（取 `result` 为博文 id）；分类 `GET /blog_catalog/list_by_user`；图片 `POST /ai/creation/project/uploadDetail`（multipart 字段 `file`，取 `result` 为图片 URL）。**切勿给该平台请求注入 `Origin`/`Referer`**：无论是用 `installHeaderRules`（作用于整个 session，会连带覆盖 `www.oschina.net` 登录页对 `apiv1` 的请求，导致 CORS 失败、微信等第三方登录报 `Network Error`），还是在 `session.fetch` 里手动设 `Referer`（Electron net 校验 referrer 策略，POST 会被 Chromium 直接拦截为 `net::ERR_BLOCKED_BY_CLIENT`）。所有请求保持默认头即可。
 
 ## 约定
 

@@ -23,7 +23,7 @@ app.whenReady().then(async () => {
     const article = toArticle(doc, join(ROOT, doc.dir))
     log('TITLE:', article.title)
 
-    for (const id of ['wechat', 'juejin', 'zhihu', 'toutiao'] as PlatformId[]) {
+    for (const id of ['wechat', 'juejin', 'zhihu', 'toutiao', 'oschina'] as PlatformId[]) {
       const adapter = getAdapter(id)
       const auth = await adapter.checkAuth()
       log(`AUTH ${id}:`, JSON.stringify(auth))
