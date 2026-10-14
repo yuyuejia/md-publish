@@ -54,10 +54,13 @@
 - 均为**非官方**内部接口逆向实现，接口易变。修改时在注释标明来源与不确定性。
 - 微信公众号正文必须内联样式（不能依赖 class / 外部 CSS），见 `src/main/markdown/wechat-style.ts`。
 - 微信公众号正文会拒绝任何非微信域名的 `<a>` 链接（**连 `#` 锚点也会触发「请勿插入非微信域名的链接」**），因此 `stripLinksForWechat` 会去掉除微信域名外的所有 `<a>`；未上传成功的图片由 `dropExternalImages` 移除（图片必须先上传到微信图床）。
+- 微信编辑器会压缩代码块的空白符，导致缩进/换行丢失、需要手动重排。`renderWechatHtml` 排除 `pre` 的「块级文本元素」解析（`PARSE_OPTIONS`），并由 `preserveCodeWhitespace` 把换行转成 `<br/>`、行首缩进与连续空格转成 `&nbsp;`。
+- 松列表（项间有空行）会被 markdown-it 渲染成 `<li><p style="margin:14px 0">…</p></li>`，上传微信后每项之间多出空行。`normalizeLists` 会拆掉单项列表项内的 `<p>`、清零多项段落的 `margin`，并移除列表中的空白文本节点。
 - 调试发布：`npm run verify:publish`（先改 `scripts/verify-publish.ts` 顶部的 `ROOT`/`DOC_ID`；用 `PUBLISH=juejin,zhihu` 选择平台），会走真实 pipeline 并创建草稿。
 - 掘金图床上传走字节 ImageX（`signAWS4` + TOS PUT + Commit，见 `src/main/adapters/crypto.ts`）；`CommitImageUpload` 不能手动设置 `Content-Length`，否则 Electron net 报 `ERR_INVALID_ARGUMENT`。
 - 知乎图片：远程图走 `zhuanlan.zhihu.com/api/uploaded_images`，本地图走 `api.zhihu.com/images` + OSS V1 签名；已存在的图片（`state:1`）需轮询 `api.zhihu.com/images/{id}` 直到返回 `original_hash`。
-- 今日头条：`mp.toutiao.com/mp/agw/article/publish?source=mp&type=article`（form-urlencoded，`X-CSRFToken` 取自 cookie `csrftoken`，`save=1` 存草稿），正文 `<p>` 需补递增 `data-track`；图片走 `mp/agw/article_material/photo/upload_picture`（字段 `upfile`）。无 `_signature` 依赖。
+- 知乎编辑器会把正文里的换行当成新段落，而 markdown-it 会在块级标签之间及段落软换行处输出 `\n`，导致上传后「每行之间多出一个空行」。`transformContent` 末尾用 `compactHtml` 压缩代码块之外的换行/多余空白，并移除块级元素之间的空白文本节点（`<pre>` 内部原样保留）。
+- 今日头条：**草稿必须由编辑器自身保存**。直接调 `mp.toutiao.com/mp/agw/article/publish?source=mp&type=article` 时 `save=1` 是「提交审核」（会进内容管理、`status:3/6`），`save=0` 又缺页面动态生成的 `tt-anti-token`（返回 `7050`）。因此 `draftOnly` 走 `BrowserWindow` 打开 `profile_v4/graphic/publish`、填入标题/正文后等编辑器自动存草稿（轮询 `mp/agw/article/list?status=draft` 确认落库并取回 `pgc_id`）；非草稿才走 `save=1` 接口，正文 `<p>` 需补递增 `data-track`。图片走 `mp/agw/article_material/photo/upload_picture`（字段 `upfile`）。
 - 开源中国：接口域 `apiv1.oschina.net/oschinapi`（JSON）。登录探测 `GET /user/myDetails`（未登录 `code=40001`）；草稿 `POST /api/draft/save_draft`（正文以 Markdown 提交，`contentType=1`，必填 `catalog`，空分类时先 `POST /blog_catalog/add?name=默认分类`，取 `result.id`）；发布 `POST /blog/web/add`（取 `result` 为博文 id）；分类 `GET /blog_catalog/list_by_user`；图片 `POST /ai/creation/project/uploadDetail`（multipart 字段 `file`，取 `result` 为图片 URL）。**切勿给该平台请求注入 `Origin`/`Referer`**：无论是用 `installHeaderRules`（作用于整个 session，会连带覆盖 `www.oschina.net` 登录页对 `apiv1` 的请求，导致 CORS 失败、微信等第三方登录报 `Network Error`），还是在 `session.fetch` 里手动设 `Referer`（Electron net 校验 referrer 策略，POST 会被 Chromium 直接拦截为 `net::ERR_BLOCKED_BY_CLIENT`）。所有请求保持默认头即可。
 
 ## 约定

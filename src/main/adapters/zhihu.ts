@@ -1,4 +1,5 @@
 import type { Session } from 'electron'
+import { NodeType, parse, type HTMLElement, type Node, type TextNode } from 'node-html-parser'
 import type { Article, AuthResult, PlatformMeta, PublishOptions, SyncResult } from '@shared/types'
 import { CookieAdapter } from './base'
 import { loadImage } from './images'
@@ -8,6 +9,44 @@ import { extractImageSrcs, rewriteImageSrcs } from '@main/markdown/wechat-style'
 const HOST = 'https://www.zhihu.com'
 const COLUMN = 'https://zhuanlan.zhihu.com'
 const API = 'https://api.zhihu.com'
+
+const BLOCK_TAGS = new Set([
+  'address', 'article', 'aside', 'blockquote', 'div', 'dl', 'dd', 'dt', 'fieldset',
+  'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'header', 'hr', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'table',
+  'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul'
+])
+
+/**
+ * 知乎编辑器会把正文里的换行当成新的段落，而 markdown-it 会在块级标签之间、以及段落内的
+ * 软换行处输出 `\n`，导致上传后「每行之间都会多出一个空行」。
+ * 这里把代码块之外的换行/多余空白压缩掉，同时移除块级元素之间的空白文本节点。
+ */
+function compactHtml(html: string): string {
+  const root = parse(html)
+  const isBlock = (node: Node | undefined): boolean =>
+    !!node && node.nodeType === NodeType.ELEMENT_NODE && BLOCK_TAGS.has((node as HTMLElement).rawTagName)
+
+  const visit = (node: Node): void => {
+    if (node.nodeType === NodeType.TEXT_NODE) {
+      const text = node as TextNode
+      text.rawText = text.rawText.replace(/\s*\n\s*/g, ' ').replace(/ {2,}/g, ' ')
+      const parent = text.parentNode
+      if (text.rawText.trim() === '' && parent) {
+        const siblings = parent.childNodes
+        const i = siblings.indexOf(text)
+        if (isBlock(siblings[i - 1]) || isBlock(siblings[i + 1])) text.remove()
+      }
+      return
+    }
+    const el = node as HTMLElement
+    if (el.rawTagName === 'pre') return
+    for (const child of [...el.childNodes]) visit(child)
+  }
+
+  for (const child of [...root.childNodes]) visit(child)
+  return root.toString()
+}
 
 interface ZhihuImageToken {
   upload_file: { state?: number; image_id?: string; object_key: string }
@@ -233,7 +272,7 @@ export class ZhihuAdapter extends CookieAdapter {
     result = result.replace(/<pre><code class="language-(\w+)">/gi, '<pre lang="$1"><code>')
     result = result.replace(/\s*data-(?!draft)[a-z-]+="[^"]*"/gi, '')
     result = result.replace(/\s*style="[^"]*"/gi, '')
-    return result
+    return compactHtml(result)
   }
 
   private transformTables(html: string): string {

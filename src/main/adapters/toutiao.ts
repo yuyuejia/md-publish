@@ -1,12 +1,14 @@
-import type { Session } from 'electron'
+import { BrowserWindow, type Session } from 'electron'
 import type { Article, AuthResult, PlatformMeta, PublishOptions, SyncResult } from '@shared/types'
 import { parse as parseHtml } from 'node-html-parser'
 import { CookieAdapter } from './base'
 import { loadImage } from './images'
+import { partitionFor } from './session-manager'
 import { extractImageSrcs, rewriteImageSrcs } from '@main/markdown/wechat-style'
 
 const HOST = 'https://mp.toutiao.com'
-const PUBLISH_PAGE = `${HOST}/profile_v3/graphic/publish`
+const PUBLISH_PAGE = `${HOST}/profile_v4/graphic/publish`
+const DRAFT_PAGE = `${HOST}/profile_v4/graphic/articles`
 const UPLOAD_URL = `${HOST}/mp/agw/article_material/photo/upload_picture?type=ueditor&pgc_watermark=1&action=uploadimage&encode=utf-8`
 
 interface ToutiaoUser {
@@ -36,8 +38,9 @@ export class ToutiaoAdapter extends CookieAdapter {
   private ensureHeaders(): void {
     this.installHeaderRules([
       {
-        test: /^https?:\/\/mp\.toutiao\.com\//,
-        headers: { Origin: HOST, Referer: `${PUBLISH_PAGE}` }
+        // 仅对接口请求注入 Origin/Referer，避免影响编辑页等页面自身的加载
+        test: /^https?:\/\/mp\.toutiao\.com\/mp\/agw\//,
+        headers: { Origin: HOST, Referer: PUBLISH_PAGE }
       }
     ])
   }
@@ -104,13 +107,6 @@ export class ToutiaoAdapter extends CookieAdapter {
 
   async publish(article: Article, options: PublishOptions): Promise<SyncResult> {
     this.ensureHeaders()
-    const csrf = await this.csrfToken()
-    // 头条要求先访问发布页建立 referer / 登录上下文
-    try {
-      await this.session.fetch(PUBLISH_PAGE, { headers: { Referer: `${HOST}/` } })
-    } catch {
-      /* ignore */
-    }
 
     let html = article.html || ''
     const mapping = new Map<string, string>()
@@ -125,9 +121,73 @@ export class ToutiaoAdapter extends CookieAdapter {
       }
     }
     if (mapping.size > 0) html = rewriteImageSrcs(html, mapping)
-    html = addTrackAttributes(html)
+    const warning = failed > 0 ? `有 ${failed} 张图片未能上传到头条图床` : undefined
 
-    const params = buildForm(article.title, html, options.summary ?? article.summary ?? '')
+    if (options.draftOnly ?? true) {
+      return this.saveDraftViaEditor(article.title, html, warning)
+    }
+    return this.submitViaApi(article, html, options, warning)
+  }
+
+  /**
+   * 草稿必须由头条编辑器自身保存：直接调用 /mp/agw/article/publish 的 save=1
+   * 会「提交审核」而非存草稿（save=0 又缺少页面生成的 tt-anti-token，返回 7050）。
+   * 这里在独立分区窗口中打开真实编辑页，填入内容后等待其自动存草稿。
+   */
+  private async saveDraftViaEditor(
+    title: string,
+    html: string,
+    warning?: string
+  ): Promise<SyncResult> {
+    const win = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        partition: partitionFor(this.meta.id),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        backgroundThrottling: false
+      }
+    })
+    try {
+      await win.loadURL(PUBLISH_PAGE)
+      if (/\/auth\/|\/login/.test(win.webContents.getURL())) {
+        throw new Error('今日头条登录态已失效，请重新登录')
+      }
+      await waitForEditor(win)
+      await fillEditor(win, title, html)
+      const draftId = await waitForDraft(win, title)
+      return this.result({
+        success: true,
+        postId: draftId,
+        postUrl: DRAFT_PAGE,
+        draftOnly: true,
+        warning
+      })
+    } finally {
+      if (!win.isDestroyed()) win.close()
+    }
+  }
+
+  /** 非草稿模式：直接调用接口提交（save=1 会进入审核/发布流程） */
+  private async submitViaApi(
+    article: Article,
+    html: string,
+    options: PublishOptions,
+    warning?: string
+  ): Promise<SyncResult> {
+    const csrf = await this.csrfToken()
+    try {
+      await this.session.fetch(PUBLISH_PAGE, { headers: { Referer: `${HOST}/` } })
+    } catch {
+      /* ignore */
+    }
+
+    const params = buildForm(
+      article.title,
+      addTrackAttributes(html),
+      options.summary ?? article.summary ?? ''
+    )
     const res = await this.session.fetch(`${HOST}/mp/agw/article/publish?source=mp&type=article`, {
       method: 'POST',
       headers: {
@@ -157,16 +217,82 @@ export class ToutiaoAdapter extends CookieAdapter {
       throw new Error(formatError(code, data.message ?? data.reason))
     }
     const pgcId = data.data?.pgc_id
-    if (pgcId == null) throw new Error('头条未返回 pgc_id，草稿创建失败')
+    if (pgcId == null || String(pgcId) === '0') {
+      throw new Error('头条未返回 pgc_id，草稿创建失败')
+    }
 
     return this.result({
       success: true,
       postId: String(pgcId),
       postUrl: `${PUBLISH_PAGE}?pgc_id=${pgcId}`,
-      draftOnly: true,
-      warning: failed > 0 ? `有 ${failed} 张图片未能上传到头条图床` : undefined
+      draftOnly: false,
+      warning
     })
   }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** 等待编辑页的标题输入框与正文编辑器就绪 */
+async function waitForEditor(win: BrowserWindow): Promise<void> {
+  const deadline = Date.now() + 30000
+  while (Date.now() < deadline) {
+    const ready = (await win.webContents
+      .executeJavaScript(
+        `!!document.querySelector('textarea') && !!document.querySelector('.ProseMirror')`
+      )
+      .catch(() => false)) as boolean
+    if (ready) return
+    await delay(500)
+  }
+  throw new Error('今日头条编辑页加载超时，请检查网络后重试')
+}
+
+/** 把标题与正文填入头条编辑器，触发其自动保存 */
+async function fillEditor(win: BrowserWindow, title: string, html: string): Promise<void> {
+  const ok = (await win.webContents.executeJavaScript(`(() => {
+    const title = ${JSON.stringify(title)}
+    const html = ${JSON.stringify(html)}
+    const ta = document.querySelector('textarea')
+    const ed = document.querySelector('.ProseMirror')
+    if (!ta || !ed) return false
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+    setter.call(ta, title)
+    ta.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    ta.dispatchEvent(new Event('change', { bubbles: true }))
+    ed.focus()
+    ed.innerHTML = html
+    ed.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste' }))
+    ed.dispatchEvent(new Event('change', { bubbles: true }))
+    return true
+  })()`)) as boolean
+  if (!ok) throw new Error('今日头条编辑器未就绪，草稿保存失败')
+  await delay(1000)
+}
+
+/** 轮询草稿列表，确认草稿已真正落库并取回 pgc_id */
+async function waitForDraft(win: BrowserWindow, title: string): Promise<string> {
+  const deadline = Date.now() + 45000
+  while (Date.now() < deadline) {
+    const id = (await win.webContents
+      .executeJavaScript(`(async () => {
+        try {
+          const res = await fetch('/mp/agw/article/list/?size=20&status=draft&from_time=0&start_time=0&end_time=0&feature=0&search_word=&source=all&page=1', { credentials: 'include' })
+          const j = await res.json()
+          const list = (j.data && (j.data.content || j.data.list)) || []
+          const title = ${JSON.stringify(title)}
+          const head = title.slice(0, 30)
+          const hit = list.find((it) => it.title === title || (it.title && it.title.indexOf(head) === 0))
+          return hit ? String(hit.pgc_id || hit.id || hit.gid || '') : ''
+        } catch { return '' }
+      })()`)
+      .catch(() => '')) as string
+    if (id) return id
+    await delay(1500)
+  }
+  throw new Error('今日头条草稿未保存成功，请重试')
 }
 
 /** 头条编辑器要求每个 <p> 带递增的 data-track */

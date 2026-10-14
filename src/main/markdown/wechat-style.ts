@@ -1,4 +1,11 @@
-import { parse } from 'node-html-parser'
+import { NodeType, parse, type HTMLElement, type Node, type TextNode } from 'node-html-parser'
+
+/**
+ * 默认情况下 node-html-parser 会把 <pre> 当作「块级文本元素」，
+ * 其内部（含 highlight.js 的 <span>）不会被解析成 DOM，导致无法处理代码块。
+ * 这里排除 pre，让代码块内部正常解析。
+ */
+const PARSE_OPTIONS = { blockTextElements: { script: true, noscript: true, style: true } }
 
 export interface WechatTheme {
   name: string
@@ -38,7 +45,7 @@ const base: WechatTheme = {
   blockquote:
     'margin:16px 0;padding:10px 16px;border-left:3px solid #d0d0d0;background:#f7f7f7;color:#666;',
   code: 'font-family:Menlo,Consolas,monospace;font-size:13px;background:#f2f3f5;padding:2px 5px;border-radius:3px;color:#c7254e;',
-  pre: 'margin:16px 0;padding:14px 16px;background:#282c34;border-radius:6px;overflow-x:auto;font-size:13px;line-height:1.6;color:#abb2bf;',
+  pre: 'margin:16px 0;padding:14px 16px;background:#282c34;border-radius:6px;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.6;color:#abb2bf;',
   img: 'max-width:100%;height:auto;display:block;margin:16px auto;border-radius:4px;',
   table: 'width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;',
   th: 'border:1px solid #e0e0e0;padding:8px 10px;background:#f7f7f7;font-weight:bold;text-align:left;',
@@ -73,12 +80,120 @@ function applyStyle(el: { getAttribute: (n: string) => string | undefined; setAt
 }
 
 /**
+ * 微信公众号编辑器会压缩代码块中的空白符，直接依赖 <pre> 的默认样式会导致缩进/换行丢失，
+ * 粘贴后必须手动重新排版。这里把换行显式转为 <br/>、行首缩进与连续的多个空格转为 &nbsp;，
+ * 从而在微信中（即使 <pre> 被剥离或 white-space 被重置）仍能保持代码排版。
+ */
+function escapeCodeText(raw: string, state: { lineStart: boolean }): string {
+  let out = ''
+  let i = 0
+  while (i < raw.length) {
+    const ch = raw[i]
+    if (ch === '\r') {
+      i++
+      continue
+    }
+    if (ch === '\n') {
+      out += '<br/>'
+      state.lineStart = true
+      i++
+      continue
+    }
+    if (ch === '\t') {
+      out += '&nbsp;&nbsp;&nbsp;&nbsp;'
+      i++
+      continue
+    }
+    if (ch === ' ') {
+      let j = i
+      while (j < raw.length && raw[j] === ' ') j++
+      const run = j - i
+      // 行首缩进或连续空格需要保留；行内的单个空格保留为普通空格以便自动折行
+      out += state.lineStart || run >= 2 ? '&nbsp;'.repeat(run) : ' '
+      i = j
+      continue
+    }
+    out += ch
+    state.lineStart = false
+    i++
+  }
+  return out
+}
+
+function findLastTextNode(node: Node): TextNode | null {
+  for (let i = node.childNodes.length - 1; i >= 0; i--) {
+    const child = node.childNodes[i]
+    if (child.nodeType === NodeType.TEXT_NODE) return child as TextNode
+    const found = findLastTextNode(child)
+    if (found) return found
+  }
+  return null
+}
+
+function preserveCodeWhitespace(pre: HTMLElement): void {
+  const state = { lineStart: true }
+  const walk = (node: Node): void => {
+    if (node.nodeType === NodeType.TEXT_NODE) {
+      const text = node as TextNode
+      text.rawText = escapeCodeText(text.rawText, state)
+      return
+    }
+    const el = node as HTMLElement
+    if (el.rawTagName === 'br') {
+      state.lineStart = true
+      return
+    }
+    for (const child of el.childNodes) walk(child)
+  }
+  for (const child of pre.childNodes) walk(child)
+  // highlight.js 会在结尾补一个换行，去掉它避免代码块底部多出一个空行
+  const last = findLastTextNode(pre)
+  if (last && last.rawText.endsWith('<br/>')) last.rawText = last.rawText.slice(0, -5)
+}
+
+function isWhitespaceText(node: Node): boolean {
+  return node.nodeType === NodeType.TEXT_NODE && (node as TextNode).rawText.trim() === ''
+}
+
+/**
+ * 微信编辑器会给列表项包裹/保留段落，松列表（项间有空行）会被 markdown-it 渲染成
+ * `<li><p style="margin:14px 0">…</p></li>`，上传后每项之间就多出空行。
+ * 这里把单项列表项内的 <p> 拆掉、多项的去掉段落外边距，并清理列表中的空白文本节点。
+ */
+function normalizeLists(root: HTMLElement): void {
+  for (const li of root.querySelectorAll('li')) {
+    const paragraphs = li.childNodes.filter(
+      (n): n is HTMLElement => n.nodeType === NodeType.ELEMENT_NODE && (n as HTMLElement).rawTagName === 'p'
+    )
+    if (paragraphs.length === 1) {
+      const p = paragraphs[0]
+      p.replaceWith(...p.childNodes)
+    } else {
+      for (const p of paragraphs) {
+        const style = p.getAttribute('style') ?? ''
+        p.setAttribute('style', style.replace(/margin:[^;]*;?/g, ''))
+      }
+    }
+    if (paragraphs.length > 0) {
+      for (const child of [...li.childNodes]) {
+        if (isWhitespaceText(child)) child.remove()
+      }
+    }
+  }
+  for (const list of root.querySelectorAll('ol, ul')) {
+    for (const child of [...list.childNodes]) {
+      if (isWhitespaceText(child)) child.remove()
+    }
+  }
+}
+
+/**
  * 将通用 HTML 转换为微信公众号友好的「内联样式」HTML。
  * 微信编辑器会剥离 class / 外部样式，因此必须内联。
  */
 export function renderWechatHtml(html: string, themeName = 'default'): string {
   const theme = wechatThemes[themeName] ?? base
-  const root = parse(html)
+  const root = parse(html, PARSE_OPTIONS)
 
   const mapping: Array<[string, string]> = [
     ['h1', theme.h1],
@@ -112,11 +227,14 @@ export function renderWechatHtml(html: string, themeName = 'default'): string {
     for (const code of pre.querySelectorAll('code')) {
       code.setAttribute('style', 'background:transparent;color:inherit;padding:0;font-size:13px;')
     }
+    preserveCodeWhitespace(pre)
   }
   for (const code of root.querySelectorAll('code')) {
     if (code.closest('pre')) continue
     applyStyle(code, theme.code)
   }
+
+  normalizeLists(root)
 
   return `<section style="${theme.container}">${root.toString()}</section>`
 }
