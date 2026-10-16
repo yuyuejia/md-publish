@@ -5,13 +5,19 @@ import { JuejinAdapter } from './juejin'
 import { ZhihuAdapter } from './zhihu'
 import { ToutiaoAdapter } from './toutiao'
 import { OschinaAdapter } from './oschina'
+import { CsdnAdapter } from './csdn'
+import { AliyunAdapter } from './aliyun'
+import { TencentAdapter } from './tencent'
 
 const adapters: CookieAdapter[] = [
   new WechatAdapter(),
   new JuejinAdapter(),
   new ZhihuAdapter(),
   new ToutiaoAdapter(),
-  new OschinaAdapter()
+  new OschinaAdapter(),
+  new CsdnAdapter(),
+  new AliyunAdapter(),
+  new TencentAdapter()
 ]
 const registry = new Map<string, CookieAdapter>(adapters.map((a) => [a.meta.id, a]))
 

@@ -16,6 +16,11 @@ export function hmacSha1Base64(key: string, message: string): string {
   return createHmac('sha1', key).update(message, 'utf8').digest('base64')
 }
 
+/** HMAC-SHA256，Base64 输出（阿里云 API 网关 / CSDN 签名） */
+export function hmacSha256Base64(key: string, message: string): string {
+  return createHmac('sha256', key).update(message, 'utf8').digest('base64')
+}
+
 function toHex(buffer: Buffer): string {
   return buffer.toString('hex')
 }
